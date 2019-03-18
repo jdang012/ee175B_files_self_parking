@@ -33,14 +33,6 @@ def filter_yellow(img):
     yellow = cv2.bitwise_and(img, img, mask=mask)
     return yellow
 
-def filter_yellow(img):
-    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)#same as white but uses hsv for yellow filtering
-    lower = np.array([20, 100, 100])
-    upper = np.array([40, 255, 255])
-    mask = cv2.inRange(hsv, lower, upper)
-    yellow = cv2.bitwise_and(img, img, mask=mask)
-    return yellow
-
 def draw_lines(img, lines, color, thickness=3, make_copy=True):
     # Copy the pasted image
     img_copy = np.copy(img) if make_copy else img
@@ -66,7 +58,7 @@ def separate_lines(lines, img):
              # dy for slope calc
                    dy=y2-y1
                    slope = float(dy) /float( dx)
-#                  print("dy",dy,"dx",dx,"slope",slope)
+                   #print("dy",dy,"dx",dx,"slope",slope)
 
 
             if slope >=slopethresh   and x2 > middle_x :  # determines if it is right lane
@@ -78,7 +70,7 @@ def separate_lines(lines, img):
 
 def masking():
     mask = np.zeros(frame.shape, dtype=np.uint8)#makes for region of interest
-    roi_corners = np.array([[(0, 480), (0, 240), (640, 240), (640, 480)]], dtype=np.int32)  # trapazoid with points
+    roi_corners = np.array([[(0, 480), (0, 240), (640, 240), (640, 480)]], dtype=np.int32)  # bottom half of screen
     channel_count = frame.shape[2]
     ignore_mask_color = (255,) * channel_count
     cv2.fillPoly(mask, roi_corners, ignore_mask_color)
@@ -104,7 +96,7 @@ def fit_lines(left,right):
             yr += [y1, y2]
 
     if len(xL) > 0:
-        mL, bL = np.polyfit(xL, yL, 1)
+        mL, bL = np.polyfit(xL, yL, 1)#fit line
     else:
         mL, mL= 1, 1
         validleft = False#makes it so it wont poly fit if no value is read
@@ -123,8 +115,8 @@ def fit_lines(left,right):
                  # draw right line
 
     if validright and validleft:
-        midpoint = int((int((240 - br) / mr) + int((240 - bL) / mL)) / 2)
-        midpoint2= int((int((480 - br) / mr) + int((480 - bL) / mL)) / 2)
+        midpoint = int((int((240 - br) / mr) + int((240 - bL) / mL)) / 2)#mid of top
+        midpoint2= int((int((480 - br) / mr) + int((480 - bL) / mL)) / 2)#mid of bottom
         # print(midpoint)
         pt1 = (midpoint - 5, 240)
         pt2 = (midpoint + 5,240)#draws parallelogram to follow
@@ -136,28 +128,28 @@ def fit_lines(left,right):
         cv2.fillConvexPoly(img2,points,color=[255,0,0])
         img, contours, hierarchy = cv2.findContours(img2.copy(), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         if len(contours) > 0:
-            newbox = cv2.minAreaRect(contours[0])#creates min area rectangle
-            (x_min, y_min), (width_min, height_min), angle = newbox #info about newbox, like regionprops in matlab
+            minrect = cv2.minAreaRect(contours[0])#creates min area rectangle
+            (x_min, y_min), (width_min, height_min), angle = minrect #info about newbox, like regionprops in matlab
             if angle <-45: # adjust so it will get correct angle values
                 angle=90+angle
             if width_min< height_min and angle >0:
                 angle =(90-angle)*-1
             if width_min > height_min and angle <0:
                 angle= 90+angle
-            midpixel = 320
+            midpixel = 320 #middle horizontal pixel of camera
             error = int(x_min - midpixel)#gives the x error
-            angle = int(angle)#gives angular error
-            box = cv2.boxPoints(newbox)#gets points of the in area rectangle
+            angle = int(angle)#gives angle
+            box = cv2.boxPoints(minrect)#gets points of the in area rectangle
             diff=midpoint-320#x error to compare
-            box = np.int0(box)
+            box = np.int0(box)# converts to int
             cv2.drawContours(framecopy, [box], 0, (0, 0, 255), 3)#draws the box
-            cv2.line(framecopy, (int(x_min), 200), (int(x_min), 240), (255, 0, 0), 3)#draws a line to show results
+            cv2.line(framecopy, (int(x_min), 230), (int(x_min), 250), (255, 0, 0), 3)#draws of where the mid
             print(error,angle,diff)
 
-            if  error >35: #the car is tilted to right, need to adjust to the left
+            if  error >20: #the car is tilted to right, need to adjust to the left
                 ser.write("L") #send signal to Arduino to adjust to left
                 print("L")
-            elif error <-35:#the car is tilted to left, need to adjust to the right
+            elif error <-20:#the car is tilted to left, need to adjust to the right
                 ser.write ("R")#send signal to Arduino to adjust to right
                 print("R")
             else:
@@ -184,7 +176,7 @@ while True:
     framecopy=orig_frame
     frame=orig_frame
     framecopy2=orig_frame
-#    cv2.imshow("orig",orig_frame) original video
+    #cv2.imshow("orig",orig_frame) original video
     masked_image=masking()
 
     filterwhite = filter_white(masked_image)#filter white
